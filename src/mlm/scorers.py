@@ -570,7 +570,7 @@ class MLMScorerPT(BaseScorer):
 
     @staticmethod
     def _check_support(model) -> bool:
-        return isinstance(model, transformers.XLMWithLMHeadModel) or isinstance(model, transformers.BertForMaskedLM) or isinstance(model, AlbertForMaskedLMOptimized) or isinstance(model, BertForMaskedLMOptimized) or isinstance(model, DistilBertForMaskedLMOptimized)
+        return isinstance(model, transformers.XLMWithLMHeadModel) or isinstance(model, transformers.BertForMaskedLM) or isinstance(model, AlbertForMaskedLMOptimized) or isinstance(model, BertForMaskedLMOptimized) or isinstance(model, DistilBertForMaskedLMOptimized) or isinstance(model, transformers.RobertaForMaskedLM)
 
 
     def _ids_to_masked(self, token_ids: np.ndarray) -> List[Tuple[np.ndarray, List[int]]]:
@@ -725,7 +725,7 @@ class MLMScorerPT(BaseScorer):
                         mask = alen < valid_length[:, None]
                         out = self._model(input_ids=token_ids, attention_mask=mask, select_positions=masked_positions)
                         out = out[0].squeeze()
-                    elif isinstance(self._model.module, transformers.BertForMaskedLM):
+                    elif isinstance(self._model.module, (transformers.BertForMaskedLM, transformers.RobertaForMaskedLM)):
                         # Because BERT does not take a length parameter
                         alen = torch.arange(token_ids.shape[1], dtype=torch.long)
                         alen = alen.to(ctx)

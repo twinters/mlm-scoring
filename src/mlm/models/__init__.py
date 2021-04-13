@@ -74,7 +74,8 @@ SUPPORTED_MLMS = [
     'roberta-large-en-cased',
     'bert-base-en-uncased-owt',
     'bert-base-multi-uncased',
-    'bert-base-multi-cased'
+    'bert-base-multi-cased',
+    
 ]
 
 SUPPORTED_LMS = [
