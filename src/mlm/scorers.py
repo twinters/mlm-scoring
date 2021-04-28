@@ -547,6 +547,7 @@ class MLMScorerPT(BaseScorer):
         self._wwm = kwargs.pop('wwm') if 'wwm' in kwargs else False
         self._lang = kwargs.pop('lang') if 'lang' in kwargs else None
         self._device = kwargs.pop('device') if 'device' in kwargs else None
+        self._distributed_backend = kwargs.pop('backend') if 'backend' in kwargs else None
         super().__init__(*args, **kwargs)
 
         if self._lang is not None and \
@@ -569,7 +570,15 @@ class MLMScorerPT(BaseScorer):
         # TODO: This does not restrict to specific GPUs however, use CUDA_VISIBLE_DEVICES?
         # TODO: It also unnecessarily locks the GPUs to each other
         self._model.to(self._device)
-        self._model = torch.nn.DataParallel(self._model, device_ids=[self._device])
+        device_ids = None
+        backend = 'gloo'
+        if self._device != torch.device('cpu'):
+            device_ids = [self._device]
+            backend = 'nccl'
+        # if not torch.distributed.is_initialized():
+        #     torch.distributed.init_process_group(backend if self._distributed_backend is None else self._distributed_backend)
+        # self._model = torch.nn.parallel.DistributedDataParallel(self._model, device_ids=device_ids)
+        self._model = torch.nn.DataParallel(self._model, device_ids=device_ids)
         self._model.eval()
 
 
@@ -702,7 +711,7 @@ class MLMScorerPT(BaseScorer):
 
             for ctx_idx, (sent_idxs, token_ids, valid_length, masked_positions, token_masked_ids, normalization) in enumerate((batch,)):
 
-                ctx = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                ctx = self._device
                 batch_size += sent_idxs.shape[0]
 
                 # TODO: Super inefficient where we go from MXNet to NumPy to PyTorch
