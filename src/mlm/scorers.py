@@ -558,7 +558,13 @@ class MLMScorerPT(BaseScorer):
             raise ValueError("Language was not set but this model uses language embeddings!")
 
         ### PyTorch-based
-        self._device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        if 'device' in kwargs:
+            device = kwargs.pop('device')
+            if isinstance(device, str):
+                device = torch.device(device)
+            self._device = device
+        else:
+            self._device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         torch.manual_seed(0)
         torch.cuda.manual_seed_all(0)
         # TODO: This does not restrict to specific GPUs however, use CUDA_VISIBLE_DEVICES?
