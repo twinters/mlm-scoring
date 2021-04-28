@@ -569,7 +569,7 @@ class MLMScorerPT(BaseScorer):
         # TODO: This does not restrict to specific GPUs however, use CUDA_VISIBLE_DEVICES?
         # TODO: It also unnecessarily locks the GPUs to each other
         self._model.to(self._device)
-        self._model = torch.nn.DataParallel(self._model, device_ids=[0])
+        self._model = torch.nn.DataParallel(self._model, device_ids=[self._device])
         self._model.eval()
 
 
