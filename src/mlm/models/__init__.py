@@ -11,6 +11,7 @@ from gluonnlp.model import get_model as _get_model
 # PyTorch-based
 import torch
 import transformers
+from transformers import RobertaTokenizer
 
 from .gpt2 import gpt2_117m, gpt2_345m
 from .bert import BERTRegression, AlbertForMaskedLMOptimized, BertForMaskedLMOptimized, DistilBertForMaskedLMOptimized
@@ -75,6 +76,7 @@ SUPPORTED_MLMS = [
     'bert-base-en-uncased-owt',
     'bert-base-multi-uncased',
     'bert-base-multi-cased',
+    'pdelobelle/robbert-v2-dutch-base'
     
 ]
 
@@ -269,6 +271,48 @@ def get_pretrained(ctxs: List[mx.Context], name: str = 'bert-base-en-uncased', p
 
             # Get tokenizer
             tokenizer = nlp.data.GPT2BPETokenizer()
+
+            # TODO: Have the scorers condition on what the vocab and tokenizer class are
+            vocab.cls_token = vocab.bos_token
+            vocab.sep_token = vocab.eos_token
+            tokenizer.convert_tokens_to_ids = vocab.to_indices
+
+        elif "robbert" in model_name:
+
+            if dataset is None:
+                print("Warning: no dataset given")
+
+            # Get stock BERT with MLM outputs
+            kwargs = {
+                # 'dataset_name': dataset_prefix + dataset_suffix,
+                'pretrained': True,
+                'ctx': ctxs,
+                'use_pooler': False,
+                'use_decoder': False,
+                'use_classifier': False
+            }
+            if finetune or regression:
+                kwargs['use_pooler'] = True
+            else:
+                kwargs['use_decoder'] = True
+            # Override GluonNLP's default location?
+            if root is not None:
+                kwargs['root'] = str(root)
+            model, vocab = get_model(name, **kwargs)
+
+            # Freeze initial layers if needed
+            for i in range(freeze):
+                model.encoder.transformer_cells[i].collect_params().setattr('grad_req', 'null')
+
+            # Wrapper if appropriate
+            # if regression:
+            #     ValueError("Not yet tested")
+            #     # NOTE THIS:
+            #     model = BERTRegression(model, dropout=0.1)
+            #     model.regression.initialize(init=mx.init.Normal(1.0), ctx=ctxs)
+
+            # Get tokenizer
+            tokenizer = RobertaTokenizer.from_pretrained("pdelobelle/robbert-v2-dutch-base")
 
             # TODO: Have the scorers condition on what the vocab and tokenizer class are
             vocab.cls_token = vocab.bos_token
