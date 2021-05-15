@@ -234,17 +234,17 @@ masked_id = {}
         dataset = self.corpus_to_dataset(corpus)
 
         # Turn Dataset into Dataloader
-        batchify_fn = btf.Tuple(
-            btf.Stack(dtype="int32"),
-            btf.Pad(
-                pad_val=self._vocab.token_to_idx[self._vocab.padding_token],
-                dtype="int32",
-            ),
-            btf.Stack(dtype="float32"),
-            btf.Stack(dtype="float32"),
-            btf.Stack(dtype="int32"),
-            btf.Stack(dtype="float32"),
-        )
+        # batchify_fn = btf.Tuple(
+        #     btf.Stack(dtype="int32"),
+        #     btf.Pad(
+        #         pad_val=self._vocab.token_to_idx[self._vocab.padding_token],
+        #         dtype="int32",
+        #     ),
+        #     btf.Stack(dtype="float32"),
+        #     btf.Stack(dtype="float32"),
+        #     btf.Stack(dtype="int32"),
+        #     btf.Stack(dtype="float32"),
+        # )
 
         # TODO: There is a 'by-design' bug in FixedBucketSampler with num_shards > 0, where it silently reuses the last utterances:
         # https://github.com/dmlc/gluon-nlp/blame/b1b61d3f90cf795c7b48b6d109db7b7b96fa21ff/src/gluonnlp/data/sampler.py#L398
