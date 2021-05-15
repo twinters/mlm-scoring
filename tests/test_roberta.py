@@ -3,13 +3,11 @@ import unittest
 from transformers import RobertaTokenizer
 
 from mlm.models.robbert import get_robbert_model
-from mlm.scorers import MLMScorer, MLMScorerPT, LMScorer
+from mlm.scorers import MLMScorer
 from mlm.models import get_pretrained
 import mxnet as mx
 
 ctxs = [mx.cpu()]  # or, e.g., [mx.gpu(0), mx.gpu(1)]
-
-
 
 
 class RobertaTest(unittest.TestCase):
@@ -22,7 +20,7 @@ class RobertaTest(unittest.TestCase):
         print(token_result)
 
         self.assertEqual(1, len(sentence_result))
-        self.assertLess(1, len(token_result[0]))
+        self.assertEqual(5, len(token_result[0]))
 
         self.assertEqual([-3.7631064113229513], sentence_result)
         self.assertEqual(
