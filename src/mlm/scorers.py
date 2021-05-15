@@ -1,32 +1,19 @@
-from abc import ABC, abstractmethod
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
 # MXNet-based
 import gluonnlp as nlp
 import gluonnlp.data.batchify as btf
-from gluonnlp.model.bert import BERTModel, RoBERTaModel
+from gluonnlp.model.bert import RoBERTaModel
 import mxnet as mx
 from mxnet.gluon import Block
 from mxnet.gluon.data import SimpleDataset
 
-# PyTorch-based
-import torch
-import transformers
-from . import batchify as btf_generic
 
-from .loaders import Corpus, ScoredCorpus
+from .loaders import Corpus
 from .models import SUPPORTED_MLMS, SUPPORTED_LMS
-from .models.bert import (
-    BERTRegression,
-    AlbertForMaskedLMOptimized,
-    BertForMaskedLMOptimized,
-    DistilBertForMaskedLMOptimized,
-)
-from .models.gpt2 import GPT2Model
 
 
 class MLMScorer:
@@ -56,21 +43,6 @@ class MLMScorer:
         self._eos = eos
         self._capitalize = capitalize
         self._max_length = 1024
-        if not self._check_support(model):
-            raise ValueError(
-                f"""
-    Model '{model.__class__.__name__}' is not supported by the scorer '{self.__class__.__name__}'.
-    - MLMScorer supports MXNet GluonNLP MLMs: {SUPPORTED_MLMS}
-    - LMScorer supports MXNet GluonNLP LMs: {SUPPORTED_LMS}
-    - MLMScorerPT supports PyTorch Transformers MLMs:
-        - 'albert-*' (wrapped by AlbertForMaskedLMOptimized)
-        - 'bert-*' (wrapped by BertForMaskedLMOptimized)
-        - 'distilbert-*' (wrapped by DistilBertForMaskedLMOptimized)
-        - 'xlm-*' (some variants require 'lang' parameter; XLM-R not supported)
-    """
-            )
-        else:
-            logging.warn(f"Created scorer of class '{self.__class__.__name__}'.")
 
     def _apply_tokenizer_opts(self, sent: str) -> str:
         if self._eos:
@@ -134,106 +106,11 @@ class MLMScorer:
             ]
         )
 
-    # def score(
-    #     self,
-    #     corpus: Corpus,
-    #     temp: float = 1.0,
-    #     split_size: int = 2000,
-    #     ratio: float = 1,
-    #     num_workers: int = 10,
-    #     per_token: bool = False,
-    # ) -> List[float]:
-    # 
-    #     ctx_cpu = mx.Context("cpu")
-    # 
-    #     # Get MXNet data objects
-    #     dataset, batch_sampler, dataloader = self._corpus_to_data(
-    #         corpus, split_size, ratio, num_workers
-    #     )
-    # 
-    #     # Get number of tokens
-    #     true_tok_lens = self._true_tok_lens(dataset)
-    # 
-    #     # Compute scores (total or per-position)
-    #     if per_token:
-    #         scores_per_token = [
-    #             [None] * (true_tok_len + 2) for true_tok_len in true_tok_lens
-    #         ]
-    #     else:
-    #         scores = np.zeros((len(corpus),))
-    # 
-    #     sent_count = 0
-    #     batch_log_interval = 20
-    # 
-    #     batch_score_accumulation = 1
-    #     batch_sent_idxs_per_ctx = [[] for ctx in self._ctxs]
-    #     batch_scores_per_ctx = [[] for ctx in self._ctxs]
-    # 
-    #     def sum_accumulated_scores():
-    #         for ctx_idx in range(len(self._ctxs)):
-    #             for batch_sent_idxs, batch_scores in zip(
-    #                 batch_sent_idxs_per_ctx[ctx_idx], batch_scores_per_ctx[ctx_idx]
-    #             ):
-    #                 if per_token:
-    #                     # Slow; only use when necessary
-    #                     for batch_sent_idx, batch_score in zip(
-    #                         batch_sent_idxs, batch_scores
-    #                     ):
-    #                         scores_per_token[batch_sent_idx.asscalar()] = batch_score
-    #                 else:
-    #                     np.add.at(
-    #                         scores, batch_sent_idxs.asnumpy(), batch_scores.asnumpy()
-    #                     )
-    #             batch_sent_idxs_per_ctx[ctx_idx] = []
-    #             batch_scores_per_ctx[ctx_idx] = []
-    # 
-    #     # For now just predicts the first non-cls token
-    #     for batch_id, batch in enumerate(dataloader):
-    # 
-    #         batch = self._split_batch(batch)
-    # 
-    #         batch_size = self._batch_ops(
-    #             batch,
-    #             batch_sent_idxs_per_ctx,
-    #             batch_scores_per_ctx,
-    #             temp,
-    #             per_token=per_token,
-    #         )
-    # 
-    #         # Ideally we'd accumulate the scores when possible, but something like the below won't work
-    #         # > scores[sent_idxs] += out
-    #         # See In[21] in https://jakevdp.github.io/PythonDataScienceHandbook/02.07-fancy-indexing.html.
-    #         # Hence, aggregation is done synchronously, every so often
-    #         # (though batch_score_accumulation = 1 seems best, since bucketing is effective in reducing GPU disparity)
-    #         if len(batch_sent_idxs_per_ctx[0]) == batch_score_accumulation:
-    #             sum_accumulated_scores()
-    # 
-    #         # Progress
-    #         sent_count += batch_size
-    #         if (batch_id + 1) % batch_log_interval == 0:
-    #             logging.info(
-    #                 "{} sents of {}, batch {} of {}".format(
-    #                     sent_count, len(dataset), batch_id + 1, len(batch_sampler)
-    #                 )
-    #             )
-    # 
-    #     # In case there are leftovers
-    #     sum_accumulated_scores()
-    # 
-    #     if per_token:
-    #         return scores_per_token, true_tok_lens
-    #     else:
-    #         return scores.tolist(), true_tok_lens
-
     def score_sentences(
         self, sentences: List[str], **kwargs
     ) -> Union[List[float], List[List[float]], float]:
         corpus = Corpus.from_text(sentences)
         return self.score(corpus, **kwargs)[0]
-
-    @staticmethod
-    def _check_support(model) -> bool:
-        return isinstance(model, nlp.model.BERTModel)
 
     def _ids_to_masked(
         self, token_ids: np.ndarray
