@@ -122,7 +122,7 @@ class MLMScorerRoberta:
         mask_indices = []
         if self._wwm:
             for idx, token_id in enumerate(token_ids):
-                if self._tokenizer.is_first_subword(self._vocab.idx_to_token[token_id]):
+                if self._tokenizer.is_first_subword(self._tokenizer.convert_ids_to_tokens(token_id)):
                     mask_indices.append([idx])
                 else:
                     mask_indices[-1].append(idx)
@@ -135,7 +135,7 @@ class MLMScorerRoberta:
         else:
             mask_indices = mask_indices[1:]
 
-        mask_token_id = self._vocab.token_to_idx[self._vocab.mask_token]
+        mask_token_id = self._tokenizer.convert_tokens_to_ids(self._tokenizer.mask_token)
         for mask_set in mask_indices:
             token_ids_masked = token_ids.copy()
             token_ids_masked[mask_set] = mask_token_id
@@ -144,7 +144,7 @@ class MLMScorerRoberta:
         return token_ids_masked_list
 
     def print_record(self, record):
-        readable_sent = [self._vocab.idx_to_token[tid] for tid in record[1]]
+        readable_sent = [self._tokenizer.convert_ids_to_tokens(tid) for tid in record[1]]
         logging.info(
             """
 sent_idx = {},
@@ -163,9 +163,10 @@ masked_id = {}
         for sent_idx, sent in enumerate(corpus.values()):
             sent = self._apply_tokenizer_opts(sent)
             if self._add_special:
+                tokenized = self._tokenizer(sent)
                 tokens_original = (
                     [self._tokenizer.cls_token]
-                    + self._tokenizer(sent)
+                    + tokenized["input_ids"]
                     + [self._tokenizer.sep_token]
                 )
             else:
@@ -235,7 +236,7 @@ masked_id = {}
         batchify_fn = btf.Tuple(
             btf.Stack(dtype="int32"),
             btf.Pad(
-                pad_val=self._vocab.token_to_idx[self._vocab.padding_token],
+                pad_val=self._tokenizer.convert_tokens_to_ids(self._tokenizer.pad_token),
                 dtype="int32",
             ),
             btf.Stack(dtype="float32"),
