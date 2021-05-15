@@ -351,13 +351,13 @@ masked_id = {}
                 valid_length = valid_length.as_in_context(ctx)
                 masked_positions = masked_positions.as_in_context(ctx).reshape(-1, 1)
 
-                if isinstance(self._model, RoBERTaModel):
-                    out = self._model(token_ids, valid_length, masked_positions)
-                else:
-                    segment_ids = mx.nd.zeros(shape=token_ids.shape, ctx=ctx)
-                    out = self._model(
-                        token_ids, segment_ids, valid_length, masked_positions
-                    )
+                out = self._model(input_ids=token_ids, attention_mask=valid_length, token_type_ids=masked_positions)
+                # out = self._model(token_ids, valid_length, masked_positions)
+                # else:
+                #     segment_ids = mx.nd.zeros(shape=token_ids.shape, ctx=ctx)
+                #     out = self._model(
+                #         token_ids, segment_ids, valid_length, masked_positions
+                #     )
 
                 # Get the probability computed for the correct token
                 split_size = token_ids.shape[0]
