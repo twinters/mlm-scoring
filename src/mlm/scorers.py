@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 # MXNet-based
@@ -162,7 +162,7 @@ Model '{model.__class__.__name__}' is not supported by the scorer '{self.__class
             return scores.tolist(), true_tok_lens
 
 
-    def score_sentences(self, sentences: List[str], **kwargs) -> float:
+    def score_sentences(self, sentences: List[str], **kwargs) -> Union[List[float], List[List[float]], float]:
         corpus = Corpus.from_text(sentences)
         return self.score(corpus, **kwargs)[0]
 
