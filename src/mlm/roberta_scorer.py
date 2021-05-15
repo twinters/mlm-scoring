@@ -10,7 +10,7 @@ import torch
 import mxnet as mx
 from mxnet.gluon import Block
 from mxnet.gluon.data import SimpleDataset
-
+from torch.utils.data import DataLoader
 
 from .loaders import Corpus
 
@@ -228,41 +228,42 @@ masked_id = {}
         dataset = self.corpus_to_dataset(corpus)
 
         # Turn Dataset into Dataloader
-        batchify_fn = btf.Tuple(
-            btf.Stack(dtype="int32"),
-            btf.Pad(
-                pad_val=self._tokenizer.convert_tokens_to_ids(
-                    self._tokenizer.pad_token
-                ),
-                dtype="int32",
-            ),
-            btf.Stack(dtype="float32"),
-            btf.Stack(dtype="float32"),
-            btf.Stack(dtype="int32"),
-            btf.Stack(dtype="float32"),
-        )
+        # batchify_fn = btf.Tuple(
+        #     btf.Stack(dtype="int32"),
+        #     btf.Pad(
+        #         pad_val=self._tokenizer.convert_tokens_to_ids(
+        #             self._tokenizer.pad_token
+        #         ),
+        #         dtype="int32",
+        #     ),
+        #     btf.Stack(dtype="float32"),
+        #     btf.Stack(dtype="float32"),
+        #     btf.Stack(dtype="int32"),
+        #     btf.Stack(dtype="float32"),
+        # )
 
         # TODO: There is a 'by-design' bug in FixedBucketSampler with num_shards > 0, where it silently reuses the last utterances:
         # https://github.com/dmlc/gluon-nlp/blame/b1b61d3f90cf795c7b48b6d109db7b7b96fa21ff/src/gluonnlp/data/sampler.py#L398
         # batch_sampler = nlp.data.sampler.FixedBucketSampler([sent_tuple[2] for sent_tuple in dataset], batch_size=split_size, ratio=ratio, num_shards=len(self._ctxs), shuffle=False)
         # Hence, we use num_shards = 0 and do gluon's split_data
-        batch_sampler = nlp.data.sampler.FixedBucketSampler(
-            [sent_tuple[2] for sent_tuple in dataset],
-            batch_size=split_size,
-            ratio=ratio,
-            num_shards=0,
-            shuffle=False,
-        )
+        # batch_sampler = nlp.data.sampler.FixedBucketSampler(
+        #     [sent_tuple[2] for sent_tuple in dataset],
+        #     batch_size=split_size,
+        #     ratio=ratio,
+        #     num_shards=0,
+        #     shuffle=False,
+        # )
 
-        logging.info(batch_sampler.stats())
-        dataloader = nlp.data.ShardedDataLoader(
-            dataset,
-            pin_memory=True,
-            batch_sampler=batch_sampler,
-            batchify_fn=batchify_fn,
-            num_workers=num_workers,
-            thread_pool=True,
-        )
+        # logging.info(batch_sampler.stats())
+        # dataloader = nlp.data.ShardedDataLoader(
+        #     dataset,
+        #     pin_memory=True,
+        #     batch_sampler=batch_sampler,
+        #     batchify_fn=batchify_fn,
+        #     num_workers=num_workers,
+        #     thread_pool=True,
+        # )
+        dataloader = DataLoader(dataset)
 
         # Get lengths in tokens (assumes dataset is in order)
         prev_sent_idx = None
@@ -288,8 +289,8 @@ masked_id = {}
         else:
             scores = np.zeros((len(corpus),))
 
-        sent_count = 0
-        batch_log_interval = 20
+        # sent_count = 0
+        # batch_log_interval = 20
 
         batch_score_accumulation = 1
         batch_sent_idxs_per_ctx = [[]]
@@ -363,7 +364,7 @@ masked_id = {}
                 #     )
 
                 # Get the probability computed for the correct token
-                split_size = token_ids.shape[0]
+                # split_size = token_ids.shape[0]
                 # out[0] contains the representations
                 # out[1] is what contains the distribution for the masked
 
@@ -373,14 +374,14 @@ masked_id = {}
                 out = out[1].log_softmax(temperature=temp)
 
                 # Save the scores at the masked indices
-                batch_sent_idxs_per_ctx[ctx_idx].append(sent_idxs)
-                out = out[
-                    list(range(split_size)),
-                    [0] * split_size,
-                    token_masked_ids.reshape(-1),
-                ]
-                batch_scores_per_ctx[ctx_idx].append(out)
-                batch_masked_positions_per_ctx[ctx_idx].append(masked_positions)
+                # batch_sent_idxs_per_ctx[ctx_idx].append(sent_idxs)
+                # out = out[
+                #     list(range(split_size)),
+                #     [0] * split_size,
+                #     token_masked_ids.reshape(-1),
+                # ]
+                # batch_scores_per_ctx[ctx_idx].append(out)
+                # batch_masked_positions_per_ctx[ctx_idx].append(masked_positions)
 
             # Ideally we'd accumulate the scores when possible, but something like the below won't work
             # > scores[sent_idxs] += out
