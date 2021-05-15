@@ -16,7 +16,7 @@ from .loaders import Corpus
 from .models import SUPPORTED_MLMS, SUPPORTED_LMS
 
 
-class MLMScorer:
+class MLMScorerRoberta:
     """For models that need every token to be masked"""
 
     """A wrapper around a model which can score utterances
@@ -25,7 +25,6 @@ class MLMScorer:
     def __init__(
         self,
         model: Block,
-        vocab: nlp.Vocab,
         tokenizer,
         ctxs: List[mx.Context],
         eos: Optional[bool] = None,
@@ -37,7 +36,6 @@ class MLMScorer:
         self._add_special = True
 
         self._model = model
-        self._vocab = vocab
         self._tokenizer = tokenizer
         self._ctxs = ctxs
         self._eos = eos
@@ -166,12 +164,12 @@ masked_id = {}
             sent = self._apply_tokenizer_opts(sent)
             if self._add_special:
                 tokens_original = (
-                    [self._vocab.cls_token]
+                    [self._tokenizer.cls_token]
                     + self._tokenizer(sent)
-                    + [self._vocab.sep_token]
+                    + [self._tokenizer.sep_token]
                 )
             else:
-                tokens_original = [self._vocab.cls_token] + self._tokenizer(sent)
+                tokens_original = [self._tokenizer.cls_token] + self._tokenizer(sent)
             ids_original = np.array(
                 self._tokenizer.convert_tokens_to_ids(tokens_original)
             )
