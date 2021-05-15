@@ -221,48 +221,8 @@ masked_id = {}
         num_workers: int = 10,
         per_token: bool = False,
     ) -> List[float]:
-
-        # ctx_cpu = mx.Context("cpu")
-
         # Turn corpus into a BERT-ready Dataset
         dataset = self.corpus_to_dataset(corpus)
-
-        # Turn Dataset into Dataloader
-        # batchify_fn = btf.Tuple(
-        #     btf.Stack(dtype="int32"),
-        #     btf.Pad(
-        #         pad_val=self._tokenizer.convert_tokens_to_ids(
-        #             self._tokenizer.pad_token
-        #         ),
-        #         dtype="int32",
-        #     ),
-        #     btf.Stack(dtype="float32"),
-        #     btf.Stack(dtype="float32"),
-        #     btf.Stack(dtype="int32"),
-        #     btf.Stack(dtype="float32"),
-        # )
-
-        # TODO: There is a 'by-design' bug in FixedBucketSampler with num_shards > 0, where it silently reuses the last utterances:
-        # https://github.com/dmlc/gluon-nlp/blame/b1b61d3f90cf795c7b48b6d109db7b7b96fa21ff/src/gluonnlp/data/sampler.py#L398
-        # batch_sampler = nlp.data.sampler.FixedBucketSampler([sent_tuple[2] for sent_tuple in dataset], batch_size=split_size, ratio=ratio, num_shards=len(self._ctxs), shuffle=False)
-        # Hence, we use num_shards = 0 and do gluon's split_data
-        # batch_sampler = nlp.data.sampler.FixedBucketSampler(
-        #     [sent_tuple[2] for sent_tuple in dataset],
-        #     batch_size=split_size,
-        #     ratio=ratio,
-        #     num_shards=0,
-        #     shuffle=False,
-        # )
-
-        # logging.info(batch_sampler.stats())
-        # dataloader = nlp.data.ShardedDataLoader(
-        #     dataset,
-        #     pin_memory=True,
-        #     batch_sampler=batch_sampler,
-        #     batchify_fn=batchify_fn,
-        #     num_workers=num_workers,
-        #     thread_pool=True,
-        # )
         dataloader = DataLoader(dataset)
 
         # Get lengths in tokens (assumes dataset is in order)
@@ -271,21 +231,13 @@ masked_id = {}
         for (curr_sent_idx, _, valid_length, _, _, _) in dataset:
             if curr_sent_idx != prev_sent_idx:
                 prev_sent_idx = curr_sent_idx
-                if self._add_special:
-                    true_tok_lens.append(valid_length - 2)
-                else:
-                    true_tok_lens.append(valid_length - 1)
+                true_tok_lens.append(valid_length - 1)
 
         # Compute scores (total or per-position)
         if per_token:
-            if self._add_special:
-                scores_per_token = [
-                    [None] * (true_tok_len + 2) for true_tok_len in true_tok_lens
-                ]
-            else:
-                scores_per_token = [
-                    [None] * (true_tok_len + 1) for true_tok_len in true_tok_lens
-                ]
+            scores_per_token = [
+                [None] * (true_tok_len + 1) for true_tok_len in true_tok_lens
+            ]
         else:
             scores = np.zeros((len(corpus),))
 
@@ -334,54 +286,51 @@ masked_id = {}
             #     ]
             # )
 
-            for (
+            # for element in batch:
+            (
                 sent_idxs,
                 token_ids,
                 valid_length,
                 masked_positions,
                 token_masked_ids,
                 normalization,
-            ) in batch:
+            ) = batch
+            masked_positions = torch.as_tensor(masked_positions)
 
-                # ctx = self._ctxs[ctx_idx]
-                token_ids = token_ids
-                valid_length = valid_length
-                masked_positions = masked_positions.reshape(-1, 1)
+            # if isinstance(self._model, RoBERTaModel):
+            # token_ids = torch.as_tensor(token_ids)
 
-                # if isinstance(self._model, RoBERTaModel):
-                # token_ids = torch.as_tensor(token_ids)
+            out = self._model(
+                input_ids=token_ids,
+                attention_mask=valid_length,
+                token_type_ids=masked_positions,
+            )
+            # out = self._model(token_ids, valid_length, masked_positions)
+            # else:
+            #     segment_ids = mx.nd.zeros(shape=token_ids.shape, ctx=ctx)
+            #     out = self._model(
+            #         token_ids, segment_ids, valid_length, masked_positions
+            #     )
 
-                out = self._model(
-                    input_ids=token_ids,
-                    attention_mask=valid_length,
-                    token_type_ids=masked_positions,
-                )
-                # out = self._model(token_ids, valid_length, masked_positions)
-                # else:
-                #     segment_ids = mx.nd.zeros(shape=token_ids.shape, ctx=ctx)
-                #     out = self._model(
-                #         token_ids, segment_ids, valid_length, masked_positions
-                #     )
+            # Get the probability computed for the correct token
+            # split_size = token_ids.shape[0]
+            # out[0] contains the representations
+            # out[1] is what contains the distribution for the masked
 
-                # Get the probability computed for the correct token
-                # split_size = token_ids.shape[0]
-                # out[0] contains the representations
-                # out[1] is what contains the distribution for the masked
+            # TODO: Manual numerically-stable softmax
+            # https://stackoverflow.com/questions/42599498/numercially-stable-softmax
+            # Because we only need one scalar
+            out = out[1].log_softmax(temperature=temp)
 
-                # TODO: Manual numerically-stable softmax
-                # https://stackoverflow.com/questions/42599498/numercially-stable-softmax
-                # Because we only need one scalar
-                out = out[1].log_softmax(temperature=temp)
-
-                # Save the scores at the masked indices
-                # batch_sent_idxs_per_ctx[ctx_idx].append(sent_idxs)
-                # out = out[
-                #     list(range(split_size)),
-                #     [0] * split_size,
-                #     token_masked_ids.reshape(-1),
-                # ]
-                # batch_scores_per_ctx[ctx_idx].append(out)
-                # batch_masked_positions_per_ctx[ctx_idx].append(masked_positions)
+            # Save the scores at the masked indices
+            # batch_sent_idxs_per_ctx[ctx_idx].append(sent_idxs)
+            # out = out[
+            #     list(range(split_size)),
+            #     [0] * split_size,
+            #     token_masked_ids.reshape(-1),
+            # ]
+            # batch_scores_per_ctx[ctx_idx].append(out)
+            # batch_masked_positions_per_ctx[ctx_idx].append(masked_positions)
 
             # Ideally we'd accumulate the scores when possible, but something like the below won't work
             # > scores[sent_idxs] += out
