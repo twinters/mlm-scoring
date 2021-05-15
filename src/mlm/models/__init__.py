@@ -221,7 +221,7 @@ def get_pretrained(ctxs: List[mx.Context], name: str = 'bert-base-en-uncased', p
             # Get tokenizer
             tokenizer = nlp.data.BERTTokenizer(vocab, lower=(not cased))
 
-        elif model_name == 'roberta':
+        elif model_name.startswith('roberta'):
 
             if cased:
                 dataset_suffix = '_cased'
