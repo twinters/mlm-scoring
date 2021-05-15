@@ -45,8 +45,8 @@ class RobertaTest(unittest.TestCase):
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
         model = RobertaModel.from_pretrained("roberta-base")
 
-        scorer = MLMScorerRoberta(model, tokenizer, ctxs)
-        sentence_result = scorer.score_sentences(["Hello world!"])
+        scorer = MLMScorerRoberta(model, tokenizer)
+        sentence_result = scorer.score(["Hello world!"])
         token_result = scorer.score_sentences(["Hello world!"], per_token=True)
         print(sentence_result)
         print(token_result)
